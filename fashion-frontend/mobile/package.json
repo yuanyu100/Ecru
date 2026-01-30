@@ -1,0 +1,30 @@
+{
+  "name": "fashion-mobile",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev:mp-weixin": "uni -p mp-weixin",
+    "dev:app-plus": "uni -p app-plus",
+    "build:mp-weixin": "uni build -p mp-weixin",
+    "build:app-plus": "uni build -p app-plus"
+  },
+  "dependencies": {
+    "@dcloudio/uni-app": "^3.0.0",
+    "@dcloudio/uni-ui": "^1.4.0",
+    "@vueuse/core": "^10.0.0",
+    "axios": "^1.6.0",
+    "pinia": "^2.1.7"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "^3.0.0",
+    "@dcloudio/uni-automator": "^3.0.0",
+    "@dcloudio/uni-cli-shared": "^3.0.0",
+    "@dcloudio/uni-stacktracey": "^3.0.0",
+    "@dcloudio/vite-plugin-uni": "^3.0.0",
+    "@vue/compiler-sfc": "^3.2.0",
+    "eslint": "^8.0.0",
+    "vite": "^4.0.0",
+    "vue": "^3.2.0"
+  }
+}

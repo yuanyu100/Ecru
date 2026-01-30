@@ -1,0 +1,24 @@
+{
+  "name": "穿搭推荐系统",
+  "appid": "__UNI__APPID",
+  "description": "基于Spring Boot + AI Agent的穿搭推荐系统",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": true,
+  "app-plus": {
+    "usingComponents": true,
+    "nvueStyleCompiler": "uni-app"
+  },
+  "h5": {
+    "router": {
+      "mode": "hash"
+    }
+  },
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false
+    },
+    "usingComponents": true
+  }
+}

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>fashion-backend</artifactId>
+        <groupId>com.fashion</groupId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>fashion-model</artifactId>
+    <name>fashion-model</name>
+    <description>数据模型模块</description>
+
+    <dependencies>
+        <!-- 无依赖，数据模型是基础模块 -->
+    </dependencies>
+</project>
