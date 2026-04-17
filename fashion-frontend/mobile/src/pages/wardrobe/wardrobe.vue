@@ -1,658 +1,575 @@
 <template>
   <view class="wardrobe">
-    <!-- 顶部搜索和筛选 -->
-    <view class="header-section">
-      <view class="search-bar">
-        <view class="search-input">
-          <text class="search-icon">🔍</text>
-          <input type="text" placeholder="搜索衣物" v-model="searchQuery" />
-        </view>
-        <button class="search-button" @click="searchItems">搜索</button>
+    <!-- 顶部区域 -->
+    <view class="top-area">
+      <view class="back-button" @click="goBack">
+        <view class="back-arrow"></view>
       </view>
-      <view class="filter-bar">
-        <text class="filter-title">分类筛选：</text>
-        <view class="filter-tabs">
-          <text 
-            class="filter-tab" 
-            :class="{ active: activeCategory === 'all' }"
-            @click="setCategory('all')"
-          >
-            全部
-          </text>
-          <text 
-            class="filter-tab" 
-            :class="{ active: activeCategory === 'top' }"
-            @click="setCategory('top')"
-          >
-            上衣
-          </text>
-          <text 
-            class="filter-tab" 
-            :class="{ active: activeCategory === 'bottom' }"
-            @click="setCategory('bottom')"
-          >
-            下装
-          </text>
-          <text 
-            class="filter-tab" 
-            :class="{ active: activeCategory === 'shoes' }"
-            @click="setCategory('shoes')"
-          >
-            鞋子
-          </text>
-          <text 
-            class="filter-tab" 
-            :class="{ active: activeCategory === 'accessory' }"
-            @click="setCategory('accessory')"
-          >
-            配饰
-          </text>
-        </view>
-      </view>
+      <view class="page-title">我的衣橱</view>
+      <view class="empty-space"></view>
     </view>
 
-    <!-- 衣物列表 -->
-    <view class="clothes-list">
-      <view class="clothes-grid">
-        <view class="clothes-item" v-for="item in filteredClothes" :key="item.id" @click="viewItemDetail(item.id)">
-          <view class="clothes-image">
-            <image :src="item.imageUrl" mode="aspectFill" />
-            <view class="clothes-actions">
-              <button class="action-button edit" @click.stop="editItem(item)">
-                ✏️
-              </button>
-              <button class="action-button delete" @click.stop="deleteItem(item.id)">
-                🗑️
-              </button>
-            </view>
+    <!-- 衣橱内容区域 -->
+    <view class="wardrobe-content">
+      <!-- 分类标签 -->
+      <view class="category-tabs">
+        <view 
+          v-for="category in categories" 
+          :key="category.id"
+          class="category-tab"
+          :class="{ 'active': activeCategory === category.id }"
+          @click="switchCategory(category.id)"
+        >
+          <text>{{ category.name }}</text>
+        </view>
+      </view>
+
+      <!-- 衣服列表 -->
+      <view class="clothes-list">
+        <view 
+          v-for="(item, index) in filteredClothes" 
+          :key="index"
+          class="clothes-item"
+          @click="viewClothesDetail(item)"
+        >
+          <view class="clothes-image-container">
+            <view class="hanger"></view>
+            <image :src="item.imageUrl" mode="aspectFit" />
           </view>
           <view class="clothes-info">
             <text class="clothes-name">{{ item.name }}</text>
-            <text class="clothes-brand">{{ item.brand }}</text>
             <view class="clothes-tags">
-              <text class="tag">{{ item.category }}</text>
-              <text class="tag">{{ item.color.primary }}</text>
+              <text 
+                v-for="(tag, tagIndex) in item.tags" 
+                :key="tagIndex"
+                class="clothes-tag"
+              >{{ tag }}</text>
             </view>
           </view>
+        </view>
+
+        <!-- 空状态 -->
+        <view class="empty-state" v-if="filteredClothes.length === 0">
+          <view class="empty-icon">👔</view>
+          <text class="empty-text">衣橱空空如也</text>
+          <text class="empty-subtext">点击右下角按钮添加衣物</text>
         </view>
       </view>
     </view>
 
-    <!-- 底部添加按钮 -->
-    <view class="add-button-container">
-      <button class="add-button" @click="addNewItem">
-        <text class="add-icon">+</text>
-        <text class="add-text">添加衣物</text>
-      </button>
+    <!-- 添加按钮 -->
+    <view class="add-button" @click="toggleAddMenu">
+      <text>+</text>
     </view>
 
-    <!-- 添加衣物对话框 -->
-    <view class="modal" v-if="showAddModal">
-      <view class="modal-content">
-        <view class="modal-header">
-          <text class="modal-title">添加衣物</text>
-          <button class="close-button" @click="showAddModal = false">✕</button>
+    <!-- 添加菜单 -->
+    <view class="add-menu" :class="{ 'open': addMenuOpen }">
+      <view class="add-menu-content">
+        <view class="add-option" @click="takePhoto">
+          <view class="add-option-icon">📷</view>
+          <text class="add-option-text">拍照</text>
         </view>
-        <view class="modal-body">
-          <view class="form-group">
-            <text class="form-label">衣物名称</text>
-            <input type="text" v-model="newItem.name" placeholder="请输入衣物名称" />
-          </view>
-          <view class="form-group">
-            <text class="form-label">品牌</text>
-            <input type="text" v-model="newItem.brand" placeholder="请输入品牌" />
-          </view>
-          <view class="form-group">
-            <text class="form-label">分类</text>
-            <picker range="{{ categories }}" v-model="newItem.categoryIndex">
-              <view class="picker-content">
-                {{ categories[newItem.categoryIndex] }}
-              </view>
-            </picker>
-          </view>
-          <view class="form-group">
-            <text class="form-label">颜色</text>
-            <input type="text" v-model="newItem.color" placeholder="请输入颜色" />
-          </view>
-          <view class="form-group">
-            <text class="form-label">材质</text>
-            <input type="text" v-model="newItem.material" placeholder="请输入材质" />
-          </view>
-          <view class="form-group">
-            <text class="form-label">上传图片</text>
-            <button class="upload-button" @click="uploadImage">
-              {{ newItem.imageUrl ? '更换图片' : '选择图片' }}
-            </button>
-            <view class="image-preview" v-if="newItem.imageUrl">
-              <image :src="newItem.imageUrl" mode="aspectFill" />
-            </view>
-          </view>
-        </view>
-        <view class="modal-footer">
-          <button class="cancel-button" @click="showAddModal = false">取消</button>
-          <button class="confirm-button" @click="saveNewItem">保存</button>
+        <view class="add-option" @click="chooseFromAlbum">
+          <view class="add-option-icon">🖼️</view>
+          <text class="add-option-text">从相册选择</text>
         </view>
       </view>
+      <view class="add-menu-backdrop" @click="closeAddMenu"></view>
     </view>
   </view>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 
 // 响应式数据
-const searchQuery = ref('')
 const activeCategory = ref('all')
-const showAddModal = ref(false)
+const addMenuOpen = ref(false)
 
-// 衣物数据
+// 分类数据
+const categories = ref([
+  { id: 'all', name: '全部' },
+  { id: 'top', name: '上衣' },
+  { id: 'bottom', name: '下装' },
+  { id: 'dress', name: '裙装' },
+  { id: 'shoes', name: '鞋子' },
+  { id: 'accessory', name: '配饰' }
+])
+
+// 衣服数据
 const clothes = ref([
   {
     id: 1,
     name: '白色T恤',
-    brand: '优衣库',
-    category: '上衣',
-    color: { primary: '白色', secondary: '' },
-    material: '棉',
-    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=white%20cotton%20t-shirt%20plain&image_size=square'
+    category: 'top',
+    tags: ['#棉', '#白色', '#休闲'],
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=white%20t-shirt%20minimalist%20style&image_size=square'
   },
   {
     id: 2,
-    name: '牛仔裤',
-    brand: 'Levis',
-    category: '下装',
-    color: { primary: '蓝色', secondary: '' },
-    material: '牛仔布',
-    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=blue%20jeans%20classic%20fit&image_size=square'
+    name: '蓝色牛仔裤',
+    category: 'bottom',
+    tags: ['#牛仔', '#蓝色', '#休闲'],
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=blue%20jeans%20minimalist%20style&image_size=square'
   },
   {
     id: 3,
-    name: '小白鞋',
-    brand: 'Nike',
-    category: '鞋子',
-    color: { primary: '白色', secondary: '' },
-    material: '帆布',
-    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=white%20canvas%20sneakers%20nike&image_size=square'
+    name: '黑色连衣裙',
+    category: 'dress',
+    tags: ['#连衣裙', '#黑色', '#优雅'],
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=black%20dress%20minimalist%20style&image_size=square'
   },
   {
     id: 4,
-    name: '黑色外套',
-    brand: 'Zara',
-    category: '上衣',
-    color: { primary: '黑色', secondary: '' },
-    material: '羊毛',
-    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=black%20wool%20blazer%20formal&image_size=square'
+    name: '白色运动鞋',
+    category: 'shoes',
+    tags: ['#运动鞋', '#白色', '#舒适'],
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=white%20sneakers%20minimalist%20style&image_size=square'
   },
   {
     id: 5,
-    name: '灰色卫衣',
-    brand: 'Adidas',
-    category: '上衣',
-    color: { primary: '灰色', secondary: '' },
-    material: '棉混纺',
-    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=gray%20cotton%20blend%20hoodie&image_size=square'
+    name: '灰色毛衣',
+    category: 'top',
+    tags: ['#毛衣', '#灰色', '#保暖'],
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=gray%20sweater%20minimalist%20style&image_size=square'
   },
   {
     id: 6,
-    name: '棕色皮带',
-    brand: 'Gucci',
-    category: '配饰',
-    color: { primary: '棕色', secondary: '' },
-    material: '皮革',
-    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=brown%20leather%20belt%20luxury&image_size=square'
+    name: '卡其色裤子',
+    category: 'bottom',
+    tags: ['#裤子', '#卡其色', '#休闲'],
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=khaki%20pants%20minimalist%20style&image_size=square'
   }
 ])
 
-// 分类数据
-const categories = ref(['上衣', '下装', '鞋子', '配饰', '外套'])
-
-// 新衣物数据
-const newItem = ref({
-  name: '',
-  brand: '',
-  categoryIndex: 0,
-  color: '',
-  material: '',
-  imageUrl: ''
-})
-
 // 计算属性
 const filteredClothes = computed(() => {
-  let result = clothes.value
-  
-  // 按分类筛选
-  if (activeCategory.value !== 'all') {
-    const categoryMap = {
-      top: '上衣',
-      bottom: '下装',
-      shoes: '鞋子',
-      accessory: '配饰'
-    }
-    const category = categoryMap[activeCategory.value]
-    result = result.filter(item => item.category === category)
+  if (activeCategory.value === 'all') {
+    return clothes.value
   }
-  
-  // 按搜索词筛选
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    result = result.filter(item => 
-      item.name.toLowerCase().includes(query) || 
-      item.brand.toLowerCase().includes(query)
-    )
-  }
-  
-  return result
+  return clothes.value.filter(item => item.category === activeCategory.value)
 })
 
 // 方法
-const setCategory = (category) => {
-  activeCategory.value = category
+const goBack = () => {
+  uni.navigateBack()
 }
 
-const searchItems = () => {
-  console.log('Searching items with query:', searchQuery.value)
+const switchCategory = (categoryId) => {
+  activeCategory.value = categoryId
 }
 
-const viewItemDetail = (itemId) => {
-  console.log('Viewing item detail:', itemId)
+const viewClothesDetail = (item) => {
+  console.log('View clothes detail:', item)
+  // 这里可以添加跳转到衣物详情页的逻辑
 }
 
-const editItem = (item) => {
-  console.log('Editing item:', item)
+const toggleAddMenu = () => {
+  addMenuOpen.value = !addMenuOpen.value
 }
 
-const deleteItem = (itemId) => {
-  uni.showModal({
-    title: '确认删除',
-    content: '确定要删除这件衣物吗？',
-    success: (res) => {
-      if (res.confirm) {
-        clothes.value = clothes.value.filter(item => item.id !== itemId)
-        console.log('Item deleted:', itemId)
-      }
-    }
-  })
+const closeAddMenu = () => {
+  addMenuOpen.value = false
 }
 
-const addNewItem = () => {
-  showAddModal.value = true
-  // 重置表单
-  newItem.value = {
-    name: '',
-    brand: '',
-    categoryIndex: 0,
-    color: '',
-    material: '',
-    imageUrl: ''
-  }
-}
-
-const uploadImage = () => {
+const takePhoto = () => {
+  closeAddMenu()
+  // 调用相机
   uni.chooseImage({
     count: 1,
     sizeType: ['compressed'],
-    sourceType: ['album', 'camera'],
+    sourceType: ['camera'],
     success: (res) => {
-      newItem.value.imageUrl = res.tempFilePaths[0]
+      console.log('Camera selected:', res)
+      // 这里可以添加处理相机拍摄的逻辑
+    },
+    fail: (err) => {
+      console.error('Camera error:', err)
     }
   })
 }
 
-const saveNewItem = () => {
-  if (!newItem.value.name || !newItem.value.brand) {
-    uni.showToast({
-      title: '请填写完整信息',
-      icon: 'none'
-    })
-    return
-  }
-  
-  const item = {
-    id: Date.now(),
-    name: newItem.value.name,
-    brand: newItem.value.brand,
-    category: categories.value[newItem.value.categoryIndex],
-    color: { primary: newItem.value.color, secondary: '' },
-    material: newItem.value.material,
-    imageUrl: newItem.value.imageUrl || 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=clothing%20placeholder&image_size=square'
-  }
-  
-  clothes.value.push(item)
-  showAddModal.value = false
-  
-  uni.showToast({
-    title: '添加成功',
-    icon: 'success'
+const chooseFromAlbum = () => {
+  closeAddMenu()
+  // 从相册选择
+  uni.chooseImage({
+    count: 1,
+    sizeType: ['compressed'],
+    sourceType: ['album'],
+    success: (res) => {
+      console.log('Album selected:', res)
+      // 这里可以添加处理相册选择的逻辑
+    },
+    fail: (err) => {
+      console.error('Album error:', err)
+    }
   })
 }
 </script>
 
 <style scoped>
 .wardrobe {
-  background-color: #f5f7fa;
-  min-height: 100vh;
-  padding-bottom: 100rpx;
-}
-
-/* 顶部搜索和筛选 */
-.header-section {
-  background-color: white;
-  padding: 20rpx;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-}
-
-.search-bar {
-  display: flex;
-  align-items: center;
-  margin-bottom: 20rpx;
-}
-
-.search-input {
-  flex: 1;
-  background-color: #f5f7fa;
-  border-radius: 20rpx;
-  padding: 12rpx 20rpx;
-  display: flex;
-  align-items: center;
-}
-
-.search-icon {
-  font-size: 24rpx;
-  margin-right: 12rpx;
-  color: #909399;
-}
-
-.search-input input {
-  flex: 1;
-  font-size: 24rpx;
-  color: #303133;
-}
-
-.search-button {
-  margin-left: 12rpx;
-  background-color: #409EFF;
-  color: white;
-  border: none;
-  border-radius: 20rpx;
-  padding: 12rpx 24rpx;
-  font-size: 24rpx;
-}
-
-.filter-bar {
-  margin-top: 10rpx;
-}
-
-.filter-title {
-  font-size: 24rpx;
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 12rpx;
-  display: block;
-}
-
-.filter-tabs {
-  display: flex;
-  overflow-x: auto;
-  gap: 12rpx;
-  padding-bottom: 10rpx;
-}
-
-.filter-tab {
-  font-size: 22rpx;
-  color: #606266;
-  background-color: #f5f7fa;
-  padding: 8rpx 20rpx;
-  border-radius: 20rpx;
-  white-space: nowrap;
-}
-
-.filter-tab.active {
-  color: #409EFF;
-  background-color: #ecf5ff;
-}
-
-/* 衣物列表 */
-.clothes-list {
-  padding: 20rpx;
-}
-
-.clothes-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20rpx;
-}
-
-.clothes-item {
-  background-color: white;
-  border-radius: 16rpx;
-  overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-}
-
-.clothes-image {
   position: relative;
-  width: 100%;
-  height: 300rpx;
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  overflow-x: hidden;
 }
 
-.clothes-image image {
-  width: 100%;
-  height: 100%;
-}
-
-.clothes-actions {
-  position: absolute;
-  top: 10rpx;
-  right: 10rpx;
+/* 顶部区域 */
+.top-area {
   display: flex;
-  gap: 8rpx;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg) var(--spacing-md);
+  border-bottom: 1px solid var(--border-light);
 }
 
-.action-button {
-  width: 48rpx;
-  height: 48rpx;
-  border-radius: 50%;
-  border: none;
-  font-size: 24rpx;
+.back-button {
+  width: 40rpx;
+  height: 40rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0.8;
+  cursor: pointer;
 }
 
-.action-button.edit {
-  background-color: #E6A23C;
+.back-arrow {
+  width: 16rpx;
+  height: 16rpx;
+  border-left: 2rpx solid var(--text-primary);
+  border-top: 2rpx solid var(--text-primary);
+  transform: rotate(-45deg);
 }
 
-.action-button.delete {
-  background-color: #F56C6C;
+.page-title {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  color: var(--text-primary);
+}
+
+.empty-space {
+  width: 40rpx;
+}
+
+/* 衣橱内容区域 */
+.wardrobe-content {
+  padding: var(--spacing-md);
+}
+
+/* 分类标签 */
+.category-tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: var(--spacing-md);
+  padding-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.category-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.category-tab {
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--border-radius-full);
+  background-color: var(--bg-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.category-tab.active {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.category-tab text {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.category-tab.active text {
+  color: white;
+}
+
+/* 衣服列表 */
+.clothes-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.clothes-item {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-md);
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-normal);
+  cursor: pointer;
+}
+
+.clothes-item:active {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.clothes-image-container {
+  position: relative;
+  width: 120rpx;
+  height: 120rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-right: var(--spacing-md);
+}
+
+.hanger {
+  width: 60rpx;
+  height: 2rpx;
+  background-color: var(--text-tertiary);
+  position: relative;
+  margin-bottom: var(--spacing-xs);
+}
+
+.hanger::before {
+  content: '';
+  position: absolute;
+  top: -10rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20rpx;
+  height: 20rpx;
+  border: 2rpx solid var(--text-tertiary);
+  border-radius: 50%;
+}
+
+.hanger::after {
+  content: '';
+  position: absolute;
+  top: 2rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2rpx;
+  height: 20rpx;
+  background-color: var(--text-tertiary);
+}
+
+.clothes-image-container image {
+  width: 100rpx;
+  height: 100rpx;
+  margin-top: var(--spacing-xs);
 }
 
 .clothes-info {
-  padding: 16rpx;
+  flex: 1;
 }
 
 .clothes-name {
-  font-size: 26rpx;
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 4rpx;
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
   display: block;
-}
-
-.clothes-brand {
-  font-size: 22rpx;
-  color: #606266;
-  margin-bottom: 8rpx;
-  display: block;
+  margin-bottom: var(--spacing-xs);
 }
 
 .clothes-tags {
   display: flex;
-  gap: 8rpx;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
 }
 
-.tag {
-  font-size: 20rpx;
-  color: #409EFF;
-  background-color: #ecf5ff;
-  padding: 4rpx 12rpx;
-  border-radius: 16rpx;
+.clothes-tag {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  background-color: var(--bg-tertiary);
+  padding: 2rpx var(--spacing-xs);
+  border-radius: var(--border-radius-sm);
 }
 
-/* 底部添加按钮 */
-.add-button-container {
-  position: fixed;
-  bottom: 30rpx;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xxl) var(--spacing-md);
+  text-align: center;
 }
 
+.empty-icon {
+  font-size: 80rpx;
+  margin-bottom: var(--spacing-md);
+}
+
+.empty-text {
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.empty-subtext {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+}
+
+/* 添加按钮 */
 .add-button {
+  position: fixed;
+  bottom: var(--spacing-xl);
+  right: var(--spacing-md);
+  width: 60rpx;
+  height: 60rpx;
+  border: 1rpx solid var(--text-secondary);
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #409EFF;
-  color: white;
-  border: none;
-  border-radius: 30rpx;
-  padding: 20rpx 40rpx;
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
+  background-color: var(--bg-primary);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  z-index: 100;
 }
 
-.add-icon {
-  font-size: 32rpx;
-  margin-right: 8rpx;
+.add-button:active {
+  transform: scale(1.1);
+  background-color: var(--bg-secondary);
 }
 
-.add-text {
-  font-size: 24rpx;
-  font-weight: bold;
+.add-button text {
+  font-size: var(--font-size-xl);
+  color: var(--text-primary);
 }
 
-/* 模态框 */
-.modal {
+/* 添加菜单 */
+.add-menu {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  pointer-events: none;
+}
+
+.add-menu.open {
+  pointer-events: auto;
+}
+
+.add-menu-content {
+  position: absolute;
+  bottom: var(--spacing-xxl);
+  right: var(--spacing-md);
+  background-color: var(--bg-primary);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-md);
   display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  transform: translateY(20px);
+  opacity: 0;
+  transition: all var(--transition-normal);
+  pointer-events: none;
+}
+
+.add-menu.open .add-menu-content {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.add-option {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.add-option:active {
+  background-color: var(--bg-secondary);
+}
+
+.add-option-icon {
+  font-size: var(--font-size-lg);
+  margin-right: var(--spacing-md);
+}
+
+.add-option-text {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.add-menu-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+  pointer-events: none;
+}
+
+.add-menu.open .add-menu-backdrop {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  padding: var(--spacing-xxl) var(--spacing-md);
+  text-align: center;
 }
 
-.modal-content {
-  background-color: white;
-  border-radius: 20rpx;
-  width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
+.empty-icon {
+  font-size: 80rpx;
+  margin-bottom: var(--spacing-md);
 }
 
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20rpx;
-  border-bottom: 1px solid #e4e7ed;
+.empty-text {
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xs);
 }
 
-.modal-title {
-  font-size: 28rpx;
-  font-weight: bold;
-  color: #303133;
+.empty-subtext {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
 }
 
-.close-button {
-  font-size: 28rpx;
-  border: none;
-  background: none;
-  color: #909399;
+/* 响应式设计 */
+@media (max-width: 320px) {
+  .clothes-image-container {
+    width: 100rpx;
+    height: 100rpx;
+  }
+  
+  .clothes-image-container image {
+    width: 80rpx;
+    height: 80rpx;
+  }
 }
 
-.modal-body {
-  padding: 20rpx;
-}
-
-.form-group {
-  margin-bottom: 20rpx;
-}
-
-.form-label {
-  font-size: 24rpx;
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 8rpx;
-  display: block;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 12rpx;
-  border: 1px solid #dcdfe6;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-}
-
-.picker-content {
-  padding: 12rpx;
-  border: 1px solid #dcdfe6;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-  color: #303133;
-}
-
-.upload-button {
-  width: 100%;
-  padding: 12rpx;
-  border: 1px dashed #dcdfe6;
-  border-radius: 8rpx;
-  background-color: #f5f7fa;
-  font-size: 24rpx;
-  color: #606266;
-}
-
-.image-preview {
-  margin-top: 12rpx;
-  width: 100%;
-  height: 200rpx;
-  border-radius: 8rpx;
-  overflow: hidden;
-}
-
-.image-preview image {
-  width: 100%;
-  height: 100%;
-}
-
-.modal-footer {
-  display: flex;
-  gap: 12rpx;
-  padding: 20rpx;
-  border-top: 1px solid #e4e7ed;
-}
-
-.cancel-button {
-  flex: 1;
-  padding: 12rpx;
-  border: 1px solid #dcdfe6;
-  border-radius: 8rpx;
-  background-color: white;
-  font-size: 24rpx;
-  color: #606266;
-}
-
-.confirm-button {
-  flex: 1;
-  padding: 12rpx;
-  border: none;
-  border-radius: 8rpx;
-  background-color: #409EFF;
-  font-size: 24rpx;
-  color: white;
+@media (min-width: 414px) {
+  .clothes-image-container {
+    width: 140rpx;
+    height: 140rpx;
+  }
+  
+  .clothes-image-container image {
+    width: 120rpx;
+    height: 120rpx;
+  }
 }
 </style>

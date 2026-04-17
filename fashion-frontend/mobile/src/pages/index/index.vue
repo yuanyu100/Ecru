@@ -1,100 +1,111 @@
 <template>
   <view class="home">
-    <!-- 顶部天气信息 -->
-    <view class="weather-section">
-      <view class="weather-info">
-        <view class="weather-icon">
-          <image src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=sunny%20weather%20icon&image_size=square" mode="aspectFit" />
-        </view>
-        <view class="weather-details">
-          <view class="temperature">22°C</view>
-          <view class="weather-desc">晴天</view>
-          <view class="location">北京市</view>
-        </view>
+    <!-- 顶部区域 -->
+    <view class="top-area">
+      <view class="menu-icon tap-effect" @click="toggleDrawer">
+        <view class="menu-line"></view>
+        <view class="menu-line"></view>
+        <view class="menu-line"></view>
       </view>
-      <view class="date-info">
-        <view class="date">{{ currentDate }}</view>
-        <view class="weekday">{{ currentWeekday }}</view>
+      <view class="settings-icon tap-effect" @click="toggleDrawer">
+        <view class="menu-line"></view>
+        <view class="menu-line"></view>
+        <view class="menu-line"></view>
       </view>
     </view>
 
-    <!-- 今日OOTD推送 -->
-    <view class="ootd-section">
-      <view class="section-header">
-        <text class="section-title">今日OOTD</text>
-        <text class="section-more" @click="refreshOOTD">换一批</text>
+    <!-- 核心交互区 -->
+    <view class="center-stage" :class="{ 'expanded': isExpanded }">
+      <view class="prompt-text" :class="{ 'fade-out': isFading, 'fade-in': !isFading }">
+        {{ promptText }}
       </view>
-      <view class="ootd-card" @click="viewOOTDDetail">
-        <view class="ootd-image">
-          <image :src="currentOOTD.imageUrl" mode="aspectFill" />
-        </view>
-        <view class="ootd-info">
-          <view class="ootd-title">{{ currentOOTD.title }}</view>
-          <view class="ootd-description">{{ currentOOTD.description }}</view>
-          <view class="ootd-tags">
-            <text class="tag" v-for="tag in currentOOTD.tags" :key="tag">{{ tag }}</text>
-          </view>
-          <view class="ootd-score">
-            <text class="score-label">推荐指数：</text>
-            <text class="score">{{ currentOOTD.score }}分</text>
-          </view>
-        </view>
+      <view class="input-container">
+        <input 
+          v-model="userInput" 
+          class="input"
+          placeholder=""
+          @keyup.enter="handleSubmit"
+        />
       </view>
     </view>
 
-    <!-- 快速拍照入口 -->
-    <view class="camera-section">
-      <view class="camera-card" @click="openCamera">
-        <view class="camera-icon">
-          <image src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=camera%20icon%20photography&image_size=square" mode="aspectFit" />
+    <!-- 推荐流区域 -->
+    <view class="recommendation-flow" v-if="showRecommendations">
+      <view class="today-picks" v-if="!isExpanded">
+        <view 
+          v-for="(item, index) in todayPicks" 
+          :key="index"
+          class="pick-card image-hover"
+          @dblclick="handleLike(index)"
+          @longpress="handleDislike(index)"
+        >
+          <image :src="item.imageUrl" mode="aspectFill" />
+          <view v-if="item.isLiked" class="like-overlay">
+            <view class="heart-icon heartbeat">❤</view>
+          </view>
         </view>
-        <view class="camera-text">
-          <text class="camera-title">随手拍</text>
-          <text class="camera-subtitle">快速分析穿搭</text>
+      </view>
+      
+      <view class="all-recommendations waterfall" v-if="isExpanded">
+        <view 
+          v-for="(item, index) in allRecommendations" 
+          :key="index"
+          class="recommendation-card image-hover"
+          :class="{ 'small': index % 2 === 0, 'large': index % 2 === 1 }"
+          @dblclick="handleLikeRecommendation(index)"
+          @longpress="handleDislikeRecommendation(index)"
+        >
+          <image :src="item.imageUrl" mode="aspectFill" />
+          <view v-if="item.isLiked" class="like-overlay">
+            <view class="heart-icon heartbeat">❤</view>
+          </view>
         </view>
-        <view class="camera-arrow">
-          <text>→</text>
-        </view>
+      </view>
+
+      <!-- 展开/收起箭头 -->
+      <view class="expand-arrow tap-effect" @click="toggleExpand">
+        <text v-if="!isExpanded">⌄</text>
+        <text v-else>⌃</text>
       </view>
     </view>
 
-    <!-- 场景推荐 -->
-    <view class="scene-section">
-      <view class="section-header">
-        <text class="section-title">场景推荐</text>
-        <text class="section-more" @click="viewAllScenes">查看全部</text>
-      </view>
-      <view class="scene-grid">
-        <view class="scene-item" v-for="scene in scenes" :key="scene.id" @click="viewSceneRecommendations(scene.id)">
-          <view class="scene-image">
-            <image :src="scene.imageUrl" mode="aspectFill" />
+    <!-- 侧边抽屉 -->
+    <view class="drawer" :class="{ 'open': drawerOpen }">
+      <view class="drawer-content glass">
+        <view class="drawer-header">
+          <view class="user-avatar">
+            <text>U</text>
           </view>
-          <view class="scene-name">{{ scene.name }}</view>
+          <text class="drawer-title">菜单</text>
+        </view>
+        <view class="drawer-menu">
+          <view class="menu-item" @click="navigateToWardrobe">
+            <text>我的衣橱</text>
+          </view>
+          <view class="menu-item" @click="navigateToSaved">
+            <text>收藏灵感</text>
+          </view>
+          <view class="menu-item" @click="navigateToFabricWiki">
+            <text>面料百科</text>
+          </view>
+          <view class="menu-item" @click="toggleTheme">
+            <text>主题设置</text>
+          </view>
+          <view class="menu-item" @click="navigateToAbout">
+            <text>关于我们</text>
+          </view>
+        </view>
+        <view class="drawer-footer">
+          <text class="drawer-version">V2.0 极简版</text>
         </view>
       </view>
+      <view class="drawer-backdrop" @click="closeDrawer"></view>
     </view>
 
-    <!-- 穿搭趋势 -->
-    <view class="trend-section">
-      <view class="section-header">
-        <text class="section-title">穿搭趋势</text>
-        <text class="section-more" @click="viewAllTrends">查看全部</text>
-      </view>
-      <view class="trend-list">
-        <view class="trend-item" v-for="trend in trends" :key="trend.id" @click="viewTrendDetail(trend.id)">
-          <view class="trend-image">
-            <image :src="trend.imageUrl" mode="aspectFill" />
-          </view>
-          <view class="trend-info">
-            <text class="trend-title">{{ trend.title }}</text>
-            <text class="trend-description">{{ trend.description }}</text>
-            <view class="trend-meta">
-              <text class="trend-source">{{ trend.source }}</text>
-              <text class="trend-date">{{ trend.date }}</text>
-            </view>
-          </view>
-        </view>
-      </view>
+    <!-- 加载状态 -->
+    <view v-if="isLoading" class="loading-overlay">
+      <view class="loading-spinner"></view>
+      <text class="loading-text">思考中...</text>
     </view>
   </view>
 </template>
@@ -103,422 +114,611 @@
 import { ref, computed, onMounted } from 'vue'
 
 // 响应式数据
-const currentDate = ref('')
-const currentWeekday = ref('')
+const drawerOpen = ref(false)
+const userInput = ref('')
+const isLoading = ref(false)
+const showRecommendations = ref(true)
+const isExpanded = ref(false)
+const promptText = ref('上海 18°C，微风。')
+const isFading = ref(false)
 
-// OOTD数据
-const currentOOTD = ref({
-  imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=casual%20spring%20outfit%20with%20jeans%20and%20sweatshirt&image_size=portrait_4_3',
-  title: '春季休闲搭配',
-  description: '适合22°C的晴天，舒适又时尚',
-  tags: ['休闲', '春季', '舒适'],
-  score: 95
-})
+// 提示文字列表
+const promptTexts = ref([
+  '今天心情如何呢？',
+  '想穿什么？',
+  '那件克莱因蓝裙子好久没穿了'
+])
 
-// 场景推荐数据
-const scenes = ref([
+// 今日精选数据
+const todayPicks = ref([
   {
-    id: 1,
-    name: '日常通勤',
-    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=business%20casual%20outfit%20work&image_size=square'
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=minimalist%20spring%20outfit%20zen%20style&image_size=portrait_4_3',
+    isLiked: false
   },
   {
-    id: 2,
-    name: '周末约会',
-    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=romantic%20date%20outfit%20weekend&image_size=square'
-  },
-  {
-    id: 3,
-    name: '运动健身',
-    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=sports%20athletic%20outfit%20gym&image_size=square'
-  },
-  {
-    id: 4,
-    name: '派对聚会',
-    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=party%20fashion%20outfit%20evening&image_size=square'
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=elegant%20casual%20outfit%20warm%20colors&image_size=portrait_4_3',
+    isLiked: false
   }
 ])
 
-// 穿搭趋势数据
-const trends = ref([
+// 全部推荐数据
+const allRecommendations = ref([
   {
-    id: 1,
-    title: '2026春季流行色趋势',
-    description: '今年春季最热门的色彩搭配方案',
-    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=spring%202026%20color%20trends%20fashion&image_size=landscape_4_3',
-    source: '时尚杂志',
-    date: '2026-01-20'
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=minimalist%20spring%20outfit%20zen%20style&image_size=portrait_4_3',
+    isLiked: false
   },
   {
-    id: 2,
-    title: '复古风回潮',
-    description: '80年代复古风格重新流行',
-    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=80s%20retro%20fashion%20trend&image_size=landscape_4_3',
-    source: '潮流博客',
-    date: '2026-01-15'
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=elegant%20casual%20outfit%20warm%20colors&image_size=portrait_4_3',
+    isLiked: false
+  },
+  {
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=smart%20casual%20office%20outfit&image_size=portrait_4_3',
+    isLiked: false
+  },
+  {
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=weekend%20casual%20outfit%20relaxed&image_size=portrait_4_3',
+    isLiked: false
+  },
+  {
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=minimalist%20summer%20outfit&image_size=portrait_4_3',
+    isLiked: false
+  },
+  {
+    imageUrl: 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=elegant%20evening%20outfit&image_size=portrait_4_3',
+    isLiked: false
   }
 ])
 
 // 生命周期钩子
 onMounted(() => {
-  updateCurrentDate()
+  // 循环切换提示文字
+  let currentIndex = 0
+  setInterval(() => {
+    // 开始淡出效果
+    isFading.value = true
+    
+    // 等待淡出完成后切换文字
+    setTimeout(() => {
+      currentIndex = (currentIndex + 1) % promptTexts.value.length
+      promptText.value = promptTexts.value[currentIndex]
+      
+      // 开始淡入效果
+      setTimeout(() => {
+        isFading.value = false
+      }, 100)
+    }, 800)
+  }, 8000) // 延长切换间隔
 })
 
 // 方法
-const updateCurrentDate = () => {
-  const now = new Date()
-  const options = {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
+const toggleDrawer = () => {
+  drawerOpen.value = !drawerOpen.value
+}
+
+const closeDrawer = () => {
+  drawerOpen.value = false
+}
+
+const handleSubmit = () => {
+  if (userInput.value.trim()) {
+    isLoading.value = true
+    // 模拟AI思考
+    setTimeout(() => {
+      isLoading.value = false
+      // 跳转到AI响应页
+      uni.navigateTo({
+        url: '/pages/ai-answer/ai-answer'
+      })
+      userInput.value = ''
+    }, 1500)
   }
-  currentDate.value = now.toLocaleDateString('zh-CN', options)
-  
-  const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
-  currentWeekday.value = weekdays[now.getDay()]
 }
 
-const refreshOOTD = () => {
-  // 模拟刷新OOTD
-  console.log('Refreshing OOTD')
+const handleLike = (index) => {
+  todayPicks.value[index].isLiked = true
+  // 模拟红心飞入动画
+  setTimeout(() => {
+    todayPicks.value[index].isLiked = false
+  }, 1500)
 }
 
-const viewOOTDDetail = () => {
-  // 跳转到OOTD详情页
-  console.log('Viewing OOTD detail')
+const handleDislike = (index) => {
+  // 模拟烟雾消散动画
+  todayPicks.value[index].isDisliked = true
+  setTimeout(() => {
+    // 移除当前项并添加新项
+    todayPicks.value.splice(index, 1)
+    todayPicks.value.push({
+      imageUrl: `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=minimalist%20outfit%20${Math.random()}&image_size=portrait_4_3`,
+      isLiked: false
+    })
+  }, 800)
 }
 
-const openCamera = () => {
-  // 调用相机
-  uni.chooseImage({
-    count: 1,
-    sizeType: ['compressed'],
-    sourceType: ['camera'],
-    success: (res) => {
-      console.log('Camera selected:', res)
-    }
+const handleLikeRecommendation = (index) => {
+  allRecommendations.value[index].isLiked = true
+  setTimeout(() => {
+    allRecommendations.value[index].isLiked = false
+  }, 1500)
+}
+
+const handleDislikeRecommendation = (index) => {
+  allRecommendations.value[index].isDisliked = true
+  setTimeout(() => {
+    allRecommendations.value.splice(index, 1)
+    allRecommendations.value.push({
+      imageUrl: `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=minimalist%20outfit%20${Math.random()}&image_size=portrait_4_3`,
+      title: '新推荐',
+      tags: ['新', '推荐'],
+      isLiked: false
+    })
+  }, 800)
+}
+
+const toggleExpand = () => {
+  isExpanded.value = !isExpanded.value
+}
+
+const toggleTheme = () => {
+  // 模拟主题切换
+  console.log('Toggle theme')
+  closeDrawer()
+}
+
+const navigateToWardrobe = () => {
+  uni.navigateTo({
+    url: '/pages/wardrobe/wardrobe'
   })
+  closeDrawer()
 }
 
-const viewSceneRecommendations = (sceneId) => {
-  console.log('Viewing scene recommendations:', sceneId)
+const navigateToSaved = () => {
+  console.log('Navigate to saved')
+  closeDrawer()
 }
 
-const viewAllScenes = () => {
-  console.log('Viewing all scenes')
+const navigateToFabricWiki = () => {
+  console.log('Navigate to fabric wiki')
+  closeDrawer()
 }
 
-const viewTrendDetail = (trendId) => {
-  console.log('Viewing trend detail:', trendId)
-}
-
-const viewAllTrends = () => {
-  console.log('Viewing all trends')
+const navigateToAbout = () => {
+  console.log('Navigate to about')
+  closeDrawer()
 }
 </script>
 
 <style scoped>
 .home {
-  background-color: #f5f7fa;
+  position: relative;
   min-height: 100vh;
+  background-color: var(--bg-primary);
+  overflow-x: hidden;
 }
 
-/* 天气信息 */
-.weather-section {
-  background-color: #409EFF;
-  color: white;
-  padding: 20rpx;
+/* 顶部区域 */
+.top-area {
+  padding: var(--spacing-lg) var(--spacing-md);
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.weather-info {
-  display: flex;
-  align-items: center;
-}
-
-.weather-icon {
-  width: 80rpx;
-  height: 80rpx;
-  margin-right: 20rpx;
-}
-
-.weather-icon image {
+  z-index: 10;
+  position: relative;
   width: 100%;
-  height: 100%;
 }
 
-.temperature {
-  font-size: 40rpx;
-  font-weight: bold;
-}
-
-.weather-desc {
-  font-size: 28rpx;
-  margin-top: 4rpx;
-}
-
-.location {
-  font-size: 24rpx;
-  margin-top: 4rpx;
-  opacity: 0.9;
-}
-
-.date-info {
-  text-align: right;
-}
-
-.date {
-  font-size: 28rpx;
-  font-weight: bold;
-}
-
-.weekday {
-  font-size: 24rpx;
-  margin-top: 4rpx;
-  opacity: 0.9;
-}
-
-/* 通用 section 样式 */
-.section-header {
+.menu-icon, .settings-icon {
+  width: 32rpx;
+  height: 32rpx;
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
+  cursor: pointer;
+  padding: 8rpx 0;
+  z-index: 1000;
+}
+
+.menu-line {
+  width: 100%;
+  height: 2rpx;
+  background-color: var(--text-primary);
+  border-radius: 1rpx;
+  transition: all 0.3s ease;
+}
+
+.settings-icon {
+  opacity: 0.7;
+}
+
+/* 核心交互区 */
+.center-stage {
+  position: relative;
+  padding: var(--spacing-lg) var(--spacing-md);
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: 20rpx;
+  justify-content: center;
+  min-height: 80vh;
+  height: calc(100vh - 100rpx);
+  transition: all 0.5s ease;
 }
 
-.section-title {
-  font-size: 32rpx;
-  font-weight: bold;
-  color: #303133;
+.center-stage.expanded {
+  transform: translateY(-50rpx);
 }
 
-.section-more {
-  font-size: 24rpx;
-  color: #409EFF;
+.prompt-text {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xl);
+  text-align: center;
+  line-height: 1.4;
+  opacity: 1;
+  transition: opacity 1.5s ease-in-out;
 }
 
-/* OOTD 部分 */
-.ootd-section {
-  margin-top: 20rpx;
+.prompt-text.fade-in {
+  animation: fadeIn 2s ease-out forwards;
 }
 
-.ootd-card {
-  background-color: white;
-  margin: 0 20rpx;
-  border-radius: 16rpx;
-  overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+.prompt-text.fade-out {
+  opacity: 0;
+  transition: opacity 1.5s ease-in-out;
 }
 
-.ootd-image {
+.input-container {
+  width: 80%;
+  max-width: 500rpx;
+  display: flex;
+  justify-content: center;
+  margin-top: var(--spacing-xl);
+}
+
+.input {
+  width: 100%;
+  padding: var(--spacing-md) var(--spacing-md);
+  border: none;
+  border-bottom: 1px solid var(--border-normal);
+  border-radius: 0;
+  font-size: var(--font-size-lg);
+  color: var(--text-primary);
+  background-color: transparent;
+  transition: border-color 0.3s ease;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  text-align: center;
+  height: 60rpx;
+}
+
+.input:focus {
+  border-bottom-color: var(--primary-color);
+  background-color: transparent;
+}
+
+.input::placeholder {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* 推荐流区域 */
+.recommendation-flow {
+  padding: 0;
+  position: relative;
+  margin-top: var(--spacing-lg);
+}
+
+.today-picks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.pick-card {
   width: 100%;
   height: 400rpx;
+  border-radius: 0;
+  overflow: hidden;
+  position: relative;
 }
 
-.ootd-image image {
+.pick-card image {
   width: 100%;
   height: 100%;
 }
 
-.ootd-info {
-  padding: 20rpx;
-}
-
-.ootd-title {
-  font-size: 30rpx;
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 8rpx;
-}
-
-.ootd-description {
-  font-size: 24rpx;
-  color: #606266;
-  margin-bottom: 12rpx;
-  line-height: 1.4;
-}
-
-.ootd-tags {
+.like-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.3);
   display: flex;
-  flex-wrap: wrap;
-  gap: 8rpx;
-  margin-bottom: 12rpx;
-}
-
-.tag {
-  font-size: 20rpx;
-  color: #409EFF;
-  background-color: #ecf5ff;
-  padding: 4rpx 12rpx;
-  border-radius: 16rpx;
-}
-
-.ootd-score {
-  display: flex;
+  justify-content: center;
   align-items: center;
+  z-index: 10;
 }
 
-.score-label {
-  font-size: 22rpx;
-  color: #606266;
+.heart-icon {
+  font-size: 80rpx;
+  color: var(--accent-color);
 }
 
-.score {
-  font-size: 24rpx;
-  font-weight: bold;
-  color: #67C23A;
-  margin-left: 8rpx;
-}
-
-/* 相机部分 */
-.camera-section {
-  margin-top: 20rpx;
-}
-
-.camera-card {
-  background-color: white;
-  margin: 0 20rpx;
-  border-radius: 16rpx;
-  padding: 30rpx;
-  display: flex;
-  align-items: center;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-}
-
-.camera-icon {
-  width: 100rpx;
-  height: 100rpx;
-  margin-right: 30rpx;
-}
-
-.camera-icon image {
-  width: 100%;
-  height: 100%;
-}
-
-.camera-text {
-  flex: 1;
-}
-
-.camera-title {
-  font-size: 30rpx;
-  font-weight: bold;
-  color: #303133;
-  display: block;
-  margin-bottom: 8rpx;
-}
-
-.camera-subtitle {
-  font-size: 24rpx;
-  color: #606266;
-  display: block;
-}
-
-.camera-arrow {
-  font-size: 32rpx;
-  color: #909399;
-}
-
-/* 场景推荐部分 */
-.scene-section {
-  margin-top: 20rpx;
-}
-
-.scene-grid {
+/* 瀑布流布局 - 移除边距和突兀背景 */
+.all-recommendations.waterfall {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16rpx;
-  padding: 0 20rpx;
+  grid-gap: 2rpx;
+  margin-bottom: var(--spacing-xxl);
+  padding: 0;
 }
 
-.scene-item {
-  background-color: white;
-  border-radius: 16rpx;
+.recommendation-card {
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  position: relative;
+  background-color: transparent;
 }
 
-.scene-image {
-  width: 100%;
-  height: 200rpx;
+.recommendation-card.small {
+  grid-row: span 1;
+  aspect-ratio: 3/4;
 }
 
-.scene-image image {
+.recommendation-card.large {
+  grid-row: span 2;
+  aspect-ratio: 3/5;
+}
+
+.recommendation-card image {
   width: 100%;
   height: 100%;
+  object-fit: cover;
 }
 
-.scene-name {
-  font-size: 24rpx;
-  font-weight: bold;
-  color: #303133;
-  padding: 16rpx;
+/* 展开/收起箭头 */
+.expand-arrow {
+  position: fixed;
+  bottom: var(--spacing-xl);
+  right: var(--spacing-xl);
+  font-size: 64rpx;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: var(--spacing-md);
+  transition: transform 0.3s ease, color 0.3s ease;
+  z-index: 100;
+  background-color: rgba(250, 250, 245, 0.8);
+  border-radius: 50%;
+  backdrop-filter: blur(10px);
+  width: 80rpx;
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.expand-arrow:active {
+  transform: scale(1.1);
+  color: var(--text-primary);
+}
+
+/* 侧边抽屉 */
+.drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.drawer.open {
+  pointer-events: auto;
+}
+
+.drawer-content {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 70%;
+  height: 100%;
+  background-color: var(--bg-primary);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-xl);
+  transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+  pointer-events: auto;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.drawer.open .drawer-content {
+  left: 0;
+}
+
+.drawer-header {
+  margin-bottom: var(--spacing-xxl);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.user-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background-color: var(--primary-color);
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: var(--font-size-xl);
+  margin-bottom: var(--spacing-md);
+}
+
+.drawer-title {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  color: var(--text-primary);
+}
+
+.drawer-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.menu-item {
+  padding: var(--spacing-md) 0;
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.menu-item:active {
+  opacity: 0.7;
+  transform: translateX(10rpx);
+}
+
+.menu-item text {
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+}
+
+.drawer-footer {
+  margin-top: var(--spacing-xxl);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--border-light);
   text-align: center;
 }
 
-/* 趋势部分 */
-.trend-section {
-  margin-top: 20rpx;
-  margin-bottom: 100rpx;
+.drawer-version {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
 }
 
-.trend-list {
-  padding: 0 20rpx;
+.drawer-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+  z-index: 999;
 }
 
-.trend-item {
-  background-color: white;
-  border-radius: 16rpx;
-  overflow: hidden;
-  margin-bottom: 16rpx;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+.drawer.open .drawer-backdrop {
+  opacity: 1;
+  pointer-events: auto;
 }
 
-.trend-image {
-  width: 100%;
-  height: 240rpx;
-}
-
-.trend-image image {
-  width: 100%;
-  height: 100%;
-}
-
-.trend-info {
-  padding: 20rpx;
-}
-
-.trend-title {
-  font-size: 28rpx;
-  font-weight: bold;
-  color: #303133;
-  display: block;
-  margin-bottom: 8rpx;
-}
-
-.trend-description {
-  font-size: 24rpx;
-  color: #606266;
-  display: block;
-  margin-bottom: 12rpx;
-  line-height: 1.4;
-}
-
-.trend-meta {
+/* 加载状态 */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(250, 250, 245, 0.9);
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
+  z-index: 9999;
 }
 
-.trend-source {
-  font-size: 20rpx;
-  color: #909399;
+.loading-spinner {
+  width: 40rpx;
+  height: 40rpx;
+  border: 4rpx solid var(--border-light);
+  border-top: 4rpx solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: var(--spacing-md);
 }
 
-.trend-date {
-  font-size: 20rpx;
-  color: #909399;
+.loading-text {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* 动画 */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 2s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 淡入淡出切换动画 */
+.prompt-text {
+  transition: opacity 1.5s ease-in-out;
+}
+
+.prompt-text.fade-out {
+  opacity: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 320px) {
+  .center-stage {
+    padding: var(--spacing-xl) var(--spacing-md);
+  }
+  
+  .prompt-text {
+    font-size: var(--font-size-lg);
+  }
+  
+  .input-container {
+    width: 90%;
+  }
+  
+  .all-recommendations.waterfall {
+    grid-template-columns: 1fr;
+  }
+  
+  .expand-arrow {
+    font-size: 48rpx;
+    width: 64rpx;
+    height: 64rpx;
+  }
+}
+
+@media (min-width: 414px) {
+  .center-stage {
+    min-height: 350rpx;
+  }
+  
+  .pick-card {
+    height: 450rpx;
+  }
 }
 </style>
